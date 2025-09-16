@@ -47,7 +47,7 @@ export const kermarrecScraper = async () => {
 
         // Log ou insertion en base
         for (const annonce of annonces) {
-          log.info(
+          log.debug(
             `➡️ Ouverture de l'annonce: ${annonce.ville} - ${annonce.lien}`
           );
           const detailPage = await page.context().newPage();
@@ -87,7 +87,7 @@ export const kermarrecScraper = async () => {
             (imgs) => imgs.map((img) => (img as HTMLImageElement).src)
           );
 
-          console.log(
+          console.debug(
             "🖼️ Photos JSON:",
             JSON.stringify(annonce.photos, null, 2)
           );
