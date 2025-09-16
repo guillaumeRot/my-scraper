@@ -1,5 +1,7 @@
+import dotenv from "dotenv";
 import { closeDb, initDb } from "./db.js";
 import { kermarrecScraper } from "./sites/kermarrec.js";
+dotenv.config();
 
 (async () => {
   // console.log("--- Initialisation DB ---");
