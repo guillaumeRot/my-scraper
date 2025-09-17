@@ -1,33 +1,9 @@
-import pkg from "pg";
-const { Pool } = pkg;
+import { PrismaClient } from "@prisma/client";
 
-const pool = new Pool({
-  user: process.env.PGUSER,
-  host: process.env.PGHOST,
-  database: process.env.PGDATABASE,
-  password: process.env.PGPASSWORD,
-  port: Number(process.env.PGPORT),
-});
+const prisma = new PrismaClient();
 
 export async function initDb() {
-  await pool.query(`
-    DROP TABLE IF EXISTS annonces;
-  
-    CREATE TABLE annonces (
-      id SERIAL PRIMARY KEY,
-      type VARCHAR(255),
-      prix VARCHAR(100),
-      ville VARCHAR(100),
-      pieces VARCHAR(50),
-      surface VARCHAR(50),
-      lien TEXT UNIQUE, -- ⚡ je mets UNIQUE pour que ton ON CONFLICT marche
-      description TEXT,
-      photos JSONB,
-      agence VARCHAR(100),
-      created_at TIMESTAMP DEFAULT NOW(),
-      date_scraped TIMESTAMP DEFAULT NOW()
-    );
-  `);
+  await prisma.$connect();
 }
 
 export async function insertAnnonce(annonce: {
@@ -41,34 +17,36 @@ export async function insertAnnonce(annonce: {
   description?: string;
   photos?: string[];
 }) {
+  if (!annonce.lien) return;
   try {
-    await pool.query(
-      `INSERT INTO annonces (type, prix, ville, pieces, surface, lien, agence, description, photos) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
-       ON CONFLICT (lien) DO UPDATE 
-       SET type = EXCLUDED.type,
-           prix = EXCLUDED.prix,
-           ville = EXCLUDED.ville,
-           pieces = EXCLUDED.pieces,
-           surface = EXCLUDED.surface,
-           agence = EXCLUDED.agence,
-           description = EXCLUDED.description,
-           photos = EXCLUDED.photos,
-           date_scraped = NOW()`,
-      [
-        annonce.type,
-        annonce.prix,
-        annonce.ville,
-        annonce.pieces,
-        annonce.surface,
-        annonce.lien,
-        annonce.agence,
-        annonce.description,
-        JSON.stringify(annonce.photos || []), // 🔑 transforme ton tableau en JSON
-      ]
-    );
+    await prisma.annonce.upsert({
+      where: { lien: annonce.lien },
+      create: {
+        type: annonce.type ?? null,
+        prix: annonce.prix ?? null,
+        ville: annonce.ville ?? null,
+        pieces: annonce.pieces ?? null,
+        surface: annonce.surface ?? null,
+        lien: annonce.lien,
+        agence: annonce.agence,
+        description: annonce.description ?? null,
+        photos: (annonce.photos ?? []) as unknown as object,
+        // created_at/date_scraped default via Prisma schema
+      },
+      update: {
+        type: annonce.type ?? null,
+        prix: annonce.prix ?? null,
+        ville: annonce.ville ?? null,
+        pieces: annonce.pieces ?? null,
+        surface: annonce.surface ?? null,
+        agence: annonce.agence,
+        description: annonce.description ?? null,
+        photos: (annonce.photos ?? []) as unknown as object,
+        date_scraped: new Date(),
+      },
+    });
   } catch (err) {
-    console.error("Erreur insertion annonce:", err);
+    console.error("Erreur insertion annonce (Prisma):", err);
   }
 }
 
@@ -78,16 +56,14 @@ export async function deleteMissingAnnonces(
 ) {
   if (liensActuels.length === 0) return;
 
-  await pool.query(
-    `DELETE FROM annonces 
-         WHERE agence = $1 
-         AND lien NOT IN (${liensActuels
-           .map((_, i) => `$${i + 2}`)
-           .join(",")})`,
-    [agence, ...liensActuels]
-  );
+  await prisma.annonce.deleteMany({
+    where: {
+      agence,
+      lien: { notIn: liensActuels },
+    },
+  });
 }
 
 export async function closeDb() {
-  await pool.end();
+  await prisma.$disconnect();
 }

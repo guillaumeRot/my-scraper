@@ -47,9 +47,6 @@ export const kermarrecScraper = async () => {
 
         // Log ou insertion en base
         for (const annonce of annonces) {
-          log.debug(
-            `➡️ Ouverture de l'annonce: ${annonce.ville} - ${annonce.lien}`
-          );
           const detailPage = await page.context().newPage();
           await detailPage.goto(annonce.lien, {
             waitUntil: "domcontentloaded",
@@ -85,11 +82,6 @@ export const kermarrecScraper = async () => {
           annonce.photos = await detailPage.$$eval(
             ".entry-medias img",
             (imgs) => imgs.map((img) => (img as HTMLImageElement).src)
-          );
-
-          console.debug(
-            "🖼️ Photos JSON:",
-            JSON.stringify(annonce.photos, null, 2)
           );
 
           await insertAnnonce({ ...annonce, agence: "Kermarrec" });
