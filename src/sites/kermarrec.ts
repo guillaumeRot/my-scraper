@@ -1,8 +1,35 @@
 import { PlaywrightCrawler } from "crawlee";
+import fs from "fs";
+import os from "os";
+import { chromium } from "playwright";
 import { insertAnnonce } from "../db";
 
+// Fonction utilitaire pour obtenir le bon chemin Chromium
+function getChromiumPath(): string | undefined {
+  // Si on est sur un Raspberry Pi (ARM) et que chromium est installé par apt
+  if (
+    os.arch() === "arm64" ||
+    os.arch() === "arm" ||
+    fs.existsSync("/usr/bin/chromium-browser")
+  ) {
+    return "/usr/bin/chromium-browser";
+  }
+
+  // Sinon, laisser Playwright utiliser son Chromium interne
+  return undefined;
+}
+
 export const kermarrecScraper = async () => {
+  const chromiumPath = getChromiumPath();
+
   const crawler = new PlaywrightCrawler({
+    launchContext: {
+      launcher: chromium, // toujours playwright.chromium
+      launchOptions: {
+        headless: true,
+        executablePath: chromiumPath, // utilise soit celui du système, soit celui de Playwright
+      },
+    },
     async requestHandler({ page, log }) {
       log.info("🚀 Scraping Kermarrec démarré...");
 
