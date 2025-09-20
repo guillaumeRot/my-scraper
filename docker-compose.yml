@@ -1,7 +1,7 @@
 version: "3.8"
 services:
   scraper-api:
-    image: ghcr.io/guillauterot/my-scraper:latest # tout en minuscules
+    image: ghcr.io/guillaumerot/my-scraper:latest # tout en minuscules
     container_name: scraper-api
     restart: unless-stopped
     ports:
