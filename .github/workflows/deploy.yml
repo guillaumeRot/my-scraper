@@ -33,4 +33,5 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/guillaumerot/my-scraper:latest
+          tags: ghcr.io/guillauterot/my-scraper:latest
+          platforms: linux/arm/v7
