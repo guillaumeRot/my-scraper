@@ -8,7 +8,25 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Build project (optionnel si tu compiles TS -> JS)
+        run: npm run build
+
       - name: "SSH deploy to Raspberry Pi"
         uses: appleboy/ssh-action@v0.1.8
         with:
@@ -18,31 +36,20 @@ jobs:
           port: ${{ secrets.PI_PORT || 22 }}
           script: |
             set -e
-
-            # aller dans le répertoire du projet
             cd ~/my-scraper
 
-            # récupérer le dernier code (force pour éviter état local divergents)
+            # reset dépôt à la dernière version
             git fetch --all
             git reset --hard origin/master
 
-            # installer dépendances (si tu utilises nvm, décommenter le bloc nvm)
-            # export NVM_DIR="$HOME/.nvm"
-            # [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-
+            # installer dépendances (le client Prisma est déjà généré)
             npm ci --production
-            npm install tsx --save-dev          # installer tsx si absent
-            npx prisma generate                  # générer le client Prisma
 
-            # build TypeScript si nécessaire (optionnel si tu utilises tsx)
-            # npm run build
-
-            # redémarrer avec pm2 (ou démarrer si absent)
+            # redémarrer avec pm2
             if pm2 describe my-scraper-api > /dev/null; then
               pm2 restart my-scraper-api
             else
-              pm2 start npx --name my-scraper-api -- tsx server.js
+              pm2 start server.js --name my-scraper-api
             fi
 
-            # sauvegarder l'état pm2
             pm2 save
