@@ -1,4 +1,4 @@
-# Utiliser Node officiel compatible ARMv7
+# Utiliser Node compatible avec ARMv7
 FROM node:20-bullseye
 
 # Créer le dossier de travail
@@ -14,10 +14,10 @@ RUN npm install tsx --save-dev
 # Copier le reste du projet
 COPY . .
 
-# Générer Prisma en ignorant le checksum manquant (armv7)
-RUN PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1 npx prisma generate
+# Générer Prisma en mode JavaScript (pas de binaires natifs)
+RUN npx prisma generate --engine-library
 
-# Exposer le port du serveur
+# Exposer le port de l’API
 EXPOSE 3000
 
 # Lancer le serveur via tsx
