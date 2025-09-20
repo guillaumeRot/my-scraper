@@ -24,4 +24,4 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.actor }}/my-scraper:latest
+          tags: ghcr.io/guillaumerot/my-scraper:latest
