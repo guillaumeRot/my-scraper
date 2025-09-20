@@ -16,10 +16,9 @@ jobs:
           username: ${{ secrets.PI_USER }}
           key: ${{ secrets.PI_SSH_KEY }}
           port: ${{ secrets.PI_PORT || 22 }}
-          # known_hosts pour sécurité (empêche MITM)
-          known_hosts: ${{ secrets.KNOWN_HOSTS }}
           script: |
             set -e
+
             # aller dans le répertoire du projet
             cd ~/my-scraper
 
@@ -32,15 +31,17 @@ jobs:
             # [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
             npm ci --production
+            npm install tsx --save-dev          # installer tsx si absent
+            npx prisma generate                  # générer le client Prisma
 
-            # build TypeScript si nécessaire
+            # build TypeScript si nécessaire (optionnel si tu utilises tsx)
             # npm run build
 
             # redémarrer avec pm2 (ou démarrer si absent)
             if pm2 describe my-scraper-api > /dev/null; then
               pm2 restart my-scraper-api
             else
-              pm2 start server.js --name my-scraper-api
+              pm2 start npx --name my-scraper-api -- tsx server.js
             fi
 
             # sauvegarder l'état pm2
