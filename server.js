@@ -9,14 +9,17 @@ const port = process.env.PORT || 3000;
 
 app.use(express.json());
 
+// Health check
 app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
+// Homepage
 app.get("/", (req, res) => {
   res.json({ message: "API my-scraper est en ligne" });
 });
 
+// Lancer le scraper
 app.get("/run-kermarrec", async (req, res) => {
   try {
     await kermarrecScraper();
@@ -27,6 +30,7 @@ app.get("/run-kermarrec", async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`🚀 Serveur démarré sur http://localhost:${port}`);
+// ⚡ Important : écouter sur toutes les interfaces pour Docker
+app.listen(port, "0.0.0.0", () => {
+  console.log(`🚀 Serveur démarré sur http://0.0.0.0:${port}`);
 });

@@ -1,21 +1,20 @@
-# Dockerfile
+# Utiliser Node officiel
 FROM node:20
 
+# Définir le répertoire de travail
 WORKDIR /app
 
-# Copier package.json + package-lock.json
+# Copier package.json et package-lock.json et installer dépendances
 COPY package*.json ./
-
-# Installer dépendances prod
 RUN npm ci --production
 
-# Copier tout le code source
+# Copier le reste de l'application
 COPY . .
 
-# Copier le client Prisma déjà généré depuis GitHub Actions
+# Copier le client Prisma généré (depuis GitHub Actions)
 COPY node_modules/.prisma ./node_modules/.prisma
 
-# Exposer le port de l'API
+# Exposer le port
 EXPOSE 3000
 
 # Lancer le serveur
