@@ -1,7 +1,9 @@
 version: "3.8"
 services:
   scraper-api:
-    build: .
+    build:
+      context: .
+      platform: linux/arm64 # forcer le build arm64
     container_name: my-scraper-api
     ports:
       - "3000:3000"
