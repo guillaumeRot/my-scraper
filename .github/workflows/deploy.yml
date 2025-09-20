@@ -33,5 +33,5 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/guillauterot/my-scraper:latest
-          platforms: linux/arm/v7
+          tags: ghcr.io/guillaumerot/my-scraper:latest
+          platforms: linux/amd64 # Image x86 pour GitHub Actions
