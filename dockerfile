@@ -1,24 +1,23 @@
-# Utiliser Node compatible avec ARMv7
-FROM node:20-bullseye
+# Dockerfile
+FROM node:20
 
 # Créer le dossier de travail
-WORKDIR /usr/src/app
+WORKDIR /app
 
-# Copier package.json et package-lock.json
+# Copier package.json + package-lock.json pour installer deps
 COPY package*.json ./
 
-# Installer les dépendances
-RUN npm install --production
-RUN npm install tsx --save-dev
+# Installer dépendances (prod seulement)
+RUN npm ci --production
 
-# Copier le reste du projet
+# Copier tout le code source
 COPY . .
 
-# Générer Prisma en mode JavaScript (pas de binaires natifs)
-RUN npx prisma generate --engine-library
+# Générer Prisma JS client (spécifier le schema)
+RUN npx prisma generate --schema=./prisma/schema.prisma --engine-library
 
-# Exposer le port de l’API
+# Exposer le port de l'API
 EXPOSE 3000
 
-# Lancer le serveur via tsx
-CMD ["npx", "tsx", "server.js"]
+# Lancer le serveur
+CMD ["node", "server.js"]
