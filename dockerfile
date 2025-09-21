@@ -17,4 +17,5 @@ COPY . .
 EXPOSE 3000
 
 # Lancer le serveur
-CMD ["node", "server.js"]
+CMD ["npm", "run", "api"]
+

@@ -31,6 +31,6 @@ app.get("/run-kermarrec", async (req, res) => {
 });
 
 // ⚡ Important : écouter sur toutes les interfaces pour Docker
-app.listen(port, "0.0.0.0", () => {
-  console.log(`🚀 Serveur démarré sur http://0.0.0.0:${port}`);
+app.listen(port, () => {
+  console.log(`🚀 Serveur démarré sur http://localhost:${port}`);
 });
