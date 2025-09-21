@@ -11,8 +11,7 @@ RUN npm ci --production
 # Copier le reste de l'application
 COPY . .
 
-# Copier le client Prisma généré (depuis GitHub Actions)
-COPY node_modules/.prisma ./node_modules/.prisma
+# Plus besoin de copier le client Prisma
 
 # Exposer le port
 EXPOSE 3000

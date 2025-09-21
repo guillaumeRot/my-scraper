@@ -1,9 +1,54 @@
-import { PrismaClient } from "@prisma/client";
+import { Pool, PoolClient } from "pg";
 
-const prisma = new PrismaClient();
+// Configuration de la connexion à la base de données
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl:
+    process.env.NODE_ENV === "production"
+      ? { rejectUnauthorized: false }
+      : false,
+});
+
+let client: PoolClient | null = null;
 
 export async function initDb() {
-  await prisma.$connect();
+  try {
+    client = await pool.connect();
+    console.log("✅ Connexion à la base de données PostgreSQL établie");
+
+    // Vérifier si la table existe et la créer si nécessaire
+    await ensureTableExists();
+  } catch (err) {
+    console.error("❌ Erreur de connexion à la base de données:", err);
+    throw err;
+  }
+}
+
+async function ensureTableExists() {
+  if (!client) throw new Error("Client non initialisé");
+
+  const createTableQuery = `
+    CREATE TABLE IF NOT EXISTS "Annonce" (
+      id SERIAL PRIMARY KEY,
+      type VARCHAR(255),
+      prix VARCHAR(100),
+      ville VARCHAR(100),
+      pieces VARCHAR(50),
+      surface VARCHAR(50),
+      lien VARCHAR UNIQUE NOT NULL,
+      description TEXT,
+      photos JSON,
+      agence VARCHAR(100) NOT NULL,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      date_scraped TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+    
+    CREATE INDEX IF NOT EXISTS idx_annonce_lien ON "Annonce"(lien);
+    CREATE INDEX IF NOT EXISTS idx_annonce_agence ON "Annonce"(agence);
+  `;
+
+  await client.query(createTableQuery);
+  console.log("✅ Table 'Annonce' vérifiée/créée");
 }
 
 export async function insertAnnonce(annonce: {
@@ -17,36 +62,41 @@ export async function insertAnnonce(annonce: {
   description?: string;
   photos?: string[];
 }) {
-  if (!annonce.lien) return;
+  if (!annonce.lien || !client) return;
+
   try {
-    await prisma.annonce.upsert({
-      where: { lien: annonce.lien },
-      create: {
-        type: annonce.type ?? null,
-        prix: annonce.prix ?? null,
-        ville: annonce.ville ?? null,
-        pieces: annonce.pieces ?? null,
-        surface: annonce.surface ?? null,
-        lien: annonce.lien,
-        agence: annonce.agence,
-        description: annonce.description ?? null,
-        photos: (annonce.photos ?? []) as unknown as object,
-        // created_at/date_scraped default via Prisma schema
-      },
-      update: {
-        type: annonce.type ?? null,
-        prix: annonce.prix ?? null,
-        ville: annonce.ville ?? null,
-        pieces: annonce.pieces ?? null,
-        surface: annonce.surface ?? null,
-        agence: annonce.agence,
-        description: annonce.description ?? null,
-        photos: (annonce.photos ?? []) as unknown as object,
-        date_scraped: new Date(),
-      },
-    });
+    // Requête UPSERT équivalente à Prisma
+    const upsertQuery = `
+      INSERT INTO "Annonce" (type, prix, ville, pieces, surface, lien, agence, description, photos, created_at, date_scraped)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+      ON CONFLICT (lien) 
+      DO UPDATE SET
+        type = EXCLUDED.type,
+        prix = EXCLUDED.prix,
+        ville = EXCLUDED.ville,
+        pieces = EXCLUDED.pieces,
+        surface = EXCLUDED.surface,
+        agence = EXCLUDED.agence,
+        description = EXCLUDED.description,
+        photos = EXCLUDED.photos,
+        date_scraped = NOW()
+    `;
+
+    const values = [
+      annonce.type || null,
+      annonce.prix || null,
+      annonce.ville || null,
+      annonce.pieces || null,
+      annonce.surface || null,
+      annonce.lien,
+      annonce.agence,
+      annonce.description || null,
+      annonce.photos ? JSON.stringify(annonce.photos) : null,
+    ];
+
+    await client.query(upsertQuery, values);
   } catch (err) {
-    console.error("Erreur insertion annonce (Prisma):", err);
+    console.error("Erreur insertion annonce (pg):", err);
   }
 }
 
@@ -54,16 +104,28 @@ export async function deleteMissingAnnonces(
   agence: string,
   liensActuels: string[]
 ) {
-  if (liensActuels.length === 0) return;
+  if (liensActuels.length === 0 || !client) return;
 
-  await prisma.annonce.deleteMany({
-    where: {
-      agence,
-      lien: { notIn: liensActuels },
-    },
-  });
+  try {
+    const deleteQuery = `
+      DELETE FROM "Annonce" 
+      WHERE agence = $1 AND lien NOT IN (${liensActuels
+        .map((_, index) => `$${index + 2}`)
+        .join(", ")})
+    `;
+
+    const values = [agence, ...liensActuels];
+    await client.query(deleteQuery, values);
+  } catch (err) {
+    console.error("Erreur suppression annonces (pg):", err);
+  }
 }
 
 export async function closeDb() {
-  await prisma.$disconnect();
+  if (client) {
+    client.release();
+    client = null;
+  }
+  await pool.end();
+  console.log("✅ Connexion à la base de données fermée");
 }
