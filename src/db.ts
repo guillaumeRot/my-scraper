@@ -1,18 +1,25 @@
 import { Pool, PoolClient } from "pg";
 
-// Configuration de la connexion à la base de données
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl:
-    process.env.NODE_ENV === "production"
-      ? { rejectUnauthorized: false }
-      : false,
-});
-
+// Pool et client initialisés lors de initDb()
+let pool: Pool | null = null;
 let client: PoolClient | null = null;
 
 export async function initDb() {
   try {
+    // Créer le pool au moment de l'initialisation (après dotenv)
+    const url = process.env.DATABASE_URL;
+    if (!url || typeof url !== "string") {
+      throw new Error(
+        "DATABASE_URL manquante ou invalide. Vérifiez votre fichier .env"
+      );
+    }
+
+    // Neon requiert TLS. On active SSL systématiquement et on laisse la chaîne gérer sslmode.
+    pool = new Pool({
+      connectionString: url,
+      ssl: { rejectUnauthorized: false },
+    });
+
     client = await pool.connect();
     console.log("✅ Connexion à la base de données PostgreSQL établie");
 
@@ -62,10 +69,15 @@ export async function insertAnnonce(annonce: {
   description?: string;
   photos?: string[];
 }) {
-  if (!annonce.lien || !client) return;
+  if (!client) throw new Error("Client non initialisé");
+  if (!annonce.lien) {
+    console.error("annonce sans lien: " + annonce.type + " - " + annonce.prix + " - " + annonce.ville + " - " + annonce.lien);
+    return;
+  }
 
   try {
     // Requête UPSERT équivalente à Prisma
+    console.log("annonce 2: " + annonce.type + " - " + annonce.prix + " - " + annonce.ville + " - " + annonce.lien);
     const upsertQuery = `
       INSERT INTO "Annonce" (type, prix, ville, pieces, surface, lien, agence, description, photos, created_at, date_scraped)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
@@ -94,7 +106,9 @@ export async function insertAnnonce(annonce: {
       annonce.photos ? JSON.stringify(annonce.photos) : null,
     ];
 
+    console.log("annonce 3: " + annonce.type + " - " + annonce.prix + " - " + annonce.ville + " - " + annonce.lien);
     await client.query(upsertQuery, values);
+    console.log("annonce 4: " + annonce.type + " - " + annonce.prix + " - " + annonce.ville + " - " + annonce.lien);
   } catch (err) {
     console.error("Erreur insertion annonce (pg):", err);
   }
@@ -126,6 +140,9 @@ export async function closeDb() {
     client.release();
     client = null;
   }
-  await pool.end();
+  if (pool) {
+    await pool.end();
+    pool = null;
+  }
   console.log("✅ Connexion à la base de données fermée");
 }

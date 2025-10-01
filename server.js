@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import express from "express";
-import { kermarrecScraper } from "./src/sites/kermarrec.js";
+import { closeDb, initDb } from "./src/db.ts";
+import { immonotScraper } from "./src/sites/immonot.ts";
 
 dotenv.config();
 
@@ -16,7 +17,7 @@ async function runScrapersSequentially() {
   if (isScrapeRunning) return;
   isScrapeRunning = true;
   try {
-    await kermarrecScraper();
+    await immonotScraper();
   } catch (err) {
     console.error("Erreur lors de l'exécution des scrapers:", err);
   } finally {
@@ -54,7 +55,33 @@ app.get("/run-scrapers", (req, res) => {
   });
 });
 
-// ⚡ Important : écouter sur toutes les interfaces pour Docker
-app.listen(port, () => {
-  console.log(`🚀 Serveur démarré sur http://localhost:${port}`);
-});
+// ⚡ Démarrage avec initialisation de la base et arrêt propre
+async function start() {
+  try {
+    await initDb();
+  } catch (err) {
+    console.error("❌ Impossible d'initialiser la base de données. Arrêt.", err);
+    process.exit(1);
+  }
+
+  // Gestion de la fermeture propre
+  const shutdown = async (signal) => {
+    console.log(`\n🔻 Reçu ${signal}, fermeture...`);
+    try {
+      await closeDb();
+    } catch (e) {
+      console.error("Erreur lors de la fermeture de la DB:", e);
+    } finally {
+      process.exit(0);
+    }
+  };
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+
+  // Écouter sur toutes les interfaces pour Docker
+  app.listen(port, () => {
+    console.log(`🚀 Serveur démarré sur http://localhost:${port}`);
+  });
+}
+
+start();
