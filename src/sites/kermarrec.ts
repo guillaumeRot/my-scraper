@@ -2,7 +2,7 @@ import { PlaywrightCrawler } from "crawlee";
 import fs from "fs";
 import os from "os";
 import { chromium } from "playwright";
-import { insertAnnonce } from "../db";
+import { deleteMissingAnnonces, insertAnnonce } from "../db";
 
 // Fonction utilitaire pour obtenir le bon chemin Chromium
 function getChromiumPath(): string | undefined {
@@ -52,6 +52,7 @@ export const kermarrecScraper = async () => {
 
       // --- Pagination ---
       let hasNextPage = true;
+      const liensActuels: string[] = [];
       while (hasNextPage) {
         // Attendre que les annonces soient chargées
         await page.waitForSelector("article.list-bien", { timeout: 10000 });
@@ -112,6 +113,9 @@ export const kermarrecScraper = async () => {
           );
 
           await insertAnnonce({ ...annonce, agence: "Kermarrec" });
+          if (annonce.lien) {
+            liensActuels.push(annonce.lien);
+          }
 
           await detailPage.close();
         }
@@ -128,6 +132,9 @@ export const kermarrecScraper = async () => {
           hasNextPage = false;
           log.info("✅ Fin de la pagination, plus de pages.");
         }
+
+        // Nettoyer les annonces manquantes pour cette agence après pagination
+        await deleteMissingAnnonces("Kermarrec", Array.from(new Set(liensActuels)));
       }
     },
   });
