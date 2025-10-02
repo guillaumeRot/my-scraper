@@ -2,7 +2,7 @@ import { PlaywrightCrawler } from "crawlee";
 import fs from "fs";
 import os from "os";
 import { chromium } from "playwright";
-import { insertAnnonce } from "../db";
+import { deleteMissingAnnonces, insertAnnonce } from "../db";
 
 // Fonction utilitaire pour obtenir le bon chemin Chromium
 function getChromiumPath(): string | undefined {
@@ -38,7 +38,6 @@ export const immonotScraper = async () => {
       log.info("✅ Page chargée.");
       await page.waitForLoadState("networkidle", { timeout: 20000 });
 
-      // Étapes Playwright fournies
       try {
         // Accepter cookies (si présent)
         await page
@@ -80,24 +79,23 @@ export const immonotScraper = async () => {
           await page.waitForTimeout(100);
         }
 
-        // Attendre l'apparition des suggestions et sélectionner Châteaugiron
         const suggestion2 = page
           .locator('li[data-type="commune"]', { hasText: "Châteaugiron" })
           .first();
         await suggestion2.waitFor({ state: "visible", timeout: 10000 });
         await suggestion2.click();
 
-        // // Type d'annonce
+        // Type d'annonce
         await page.getByText('Aucune sélection').nth(3).click();
         await page.locator('#js-search').getByText('Achat').click();
 
-        // // Type de bien
+        // Type de bien
         await page.locator('#js-search').getByText('Aucune sélection').click();
         await page.locator('#js-search').getByText('Maisons').click();
         await page.locator('#js-search').getByText('Afficher plus').click();
         await page.locator('#js-search').getByText('Immeubles').click();
 
-        // Cliquer sur le filtre prix
+        // Filtre prix max
         await page.locator('span.il-search-item-resume[data-rel="prix"]').click();
         await page.waitForTimeout(1000);
         
@@ -108,18 +106,14 @@ export const immonotScraper = async () => {
         await maxPriceInput.press('Enter');
         await page.waitForTimeout(1000);
         
-        // Cliquer sur Appliquer
-        // await page.locator('button.js-search-update.btn-info').click();
-        // await page.waitForTimeout(2000);
-
-        // Cliquer sur le bouton Rechercher
+        // Lancer la recherche
         await page.locator('button.il-search-btn.js-search-update').click();
         await page.waitForLoadState("networkidle", { timeout: 20000 });
-        
         log.info("✅ Filtres appliqués et résultats chargés.");
 
         // --- Scraping des annonces ---
         let hasNextPage = true;
+        const liensActuels: string[] = [];
         while (hasNextPage) {
           // Attendre que les cartes soient chargées
           await page.waitForSelector(".il-card", { timeout: 30000 });
@@ -168,12 +162,12 @@ export const immonotScraper = async () => {
               // Récupérer uniquement les liens des photos depuis #js-lightgallery
               annonce.photos = (await detailPage.$$eval(
                 "#js-lightgallery a",
-                function(anchors) {
-                  var list = Array.prototype.map.call(anchors, function(a) {
+                function (anchors) {
+                  var list = Array.prototype.map.call(anchors, function (a) {
                     var href = a.getAttribute("href") || "";
                     if (!href) return "";
                     return href.startsWith("//") ? ("https:" + href) : href;
-                  }).filter(function(u) { return !!u; });
+                  }).filter(function (u) { return !!u; });
                   return Array.from(new Set(list));
                 }
               )) as unknown as string[];
@@ -189,6 +183,9 @@ export const immonotScraper = async () => {
             console.log(annonce.type + " - " + annonce.prix + " - " + annonce.ville + " - " + annonce.lien);
 
             await insertAnnonce({ ...annonce, agence: "Immonot" });
+            if (annonce.lien) {
+              liensActuels.push(annonce.lien);
+            }
           }
 
           // Vérifier s'il y a une page suivante
@@ -225,6 +222,10 @@ export const immonotScraper = async () => {
             log.info("✅ Fin de la pagination, plus de pages.");
           }
         }
+
+        // Nettoyer les annonces manquantes pour cette agence après pagination
+        await deleteMissingAnnonces("Immonot", Array.from(new Set(liensActuels)));
+
       } catch (e) {
         log.warning(
           "⚠️ Erreur lors de l'interaction avec les filtres Immonot",
