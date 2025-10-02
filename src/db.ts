@@ -77,7 +77,6 @@ export async function insertAnnonce(annonce: {
 
   try {
     // Requête UPSERT équivalente à Prisma
-    console.log("annonce 2: " + annonce.type + " - " + annonce.prix + " - " + annonce.ville + " - " + annonce.lien);
     const upsertQuery = `
       INSERT INTO "Annonce" (type, prix, ville, pieces, surface, lien, agence, description, photos, created_at, date_scraped)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
@@ -106,9 +105,7 @@ export async function insertAnnonce(annonce: {
       annonce.photos ? JSON.stringify(annonce.photos) : null,
     ];
 
-    console.log("annonce 3: " + annonce.type + " - " + annonce.prix + " - " + annonce.ville + " - " + annonce.lien);
     await client.query(upsertQuery, values);
-    console.log("annonce 4: " + annonce.type + " - " + annonce.prix + " - " + annonce.ville + " - " + annonce.lien);
   } catch (err) {
     console.error("Erreur insertion annonce (pg):", err);
   }

@@ -119,8 +119,8 @@ export const immonotScraper = async () => {
         log.info("✅ Filtres appliqués et résultats chargés.");
 
         // --- Scraping des annonces ---
-        // let hasNextPage = true;
-        // while (hasNextPage) {
+        let hasNextPage = true;
+        while (hasNextPage) {
           // Attendre que les cartes soient chargées
           await page.waitForSelector(".il-card", { timeout: 30000 });
 
@@ -162,23 +162,21 @@ export const immonotScraper = async () => {
 
               // Attendre les images
               await detailPage
-                .waitForSelector(".il-card-img", { timeout: 5000 })
+                .waitForSelector("#js-lightgallery a", { timeout: 8000 })
                 .catch(() => null);
 
-              // Récupérer toutes les photos
-              annonce.photos = await detailPage.$$eval(
-                ".il-card-img[data-src], .il-card-img[style*='background-image']",
-                (imgs) =>
-                  imgs
-                    .map((img) => {
-                      const dataSrc = img.getAttribute("data-src");
-                      if (dataSrc) return dataSrc;
-                      const style = img.getAttribute("style");
-                      const match = style?.match(/url\(["']?([^"')]+)["']?\)/);
-                      return match ? match[1] : null;
-                    })
-                    .filter((url): url is string => !!url)
-              );
+              // Récupérer uniquement les liens des photos depuis #js-lightgallery
+              annonce.photos = (await detailPage.$$eval(
+                "#js-lightgallery a",
+                function(anchors) {
+                  var list = Array.prototype.map.call(anchors, function(a) {
+                    var href = a.getAttribute("href") || "";
+                    if (!href) return "";
+                    return href.startsWith("//") ? ("https:" + href) : href;
+                  }).filter(function(u) { return !!u; });
+                  return Array.from(new Set(list));
+                }
+              )) as unknown as string[];
 
             } catch (error) {
               log.warning(`⚠️ Erreur lors du scraping de ${annonce.lien}`, {
@@ -188,23 +186,45 @@ export const immonotScraper = async () => {
               await detailPage.close();
             }
 
-            console.log("annonce 10: " + annonce.type + " - " + annonce.prix + " - " + annonce.ville + " - " + annonce.lien);
+            console.log(annonce.type + " - " + annonce.prix + " - " + annonce.ville + " - " + annonce.lien);
 
             await insertAnnonce({ ...annonce, agence: "Immonot" });
           }
 
           // Vérifier s'il y a une page suivante
-          // const nextButton = page.locator('a.page-link[rel="next"]');
-          // if ((await nextButton.count()) > 0) {
-          //   log.info("➡️ Passage à la page suivante...");
-          //   await nextButton.click();
-          //   await page.waitForTimeout(3000);
-          //   await page.waitForLoadState("networkidle", { timeout: 20000 });
-          // } else {
-          //   hasNextPage = false;
-          //   log.info("✅ Fin de la pagination, plus de pages.");
-          // }
-        // }
+          const nextButtons = page.locator('a.page-link[rel="next"]');
+          const nextCount = await nextButtons.count();
+          if (nextCount > 0) {
+            log.info("➡️ Passage à la page suivante...");
+            const nextToClick = nextButtons.first();
+            await nextToClick.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
+            // Capturer le premier lien d'annonce pour détecter le changement de page
+            const firstCardLink = await page
+              .locator('.il-card a.js-mirror-link')
+              .first()
+              .getAttribute('href')
+              .catch(() => null);
+
+            await nextToClick.click();
+            // Attendre un changement de contenu plutôt que networkidle (le site garde des connexions ouvertes)
+            await Promise.race([
+              page.waitForFunction(
+                (prevHref) => {
+                  const el = document.querySelector('.il-card a.js-mirror-link');
+                  return !!el && el.getAttribute('href') !== prevHref;
+                },
+                firstCardLink,
+                { timeout: 30000 }
+              ),
+              page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => null),
+            ]);
+            // S'assurer que les cartes sont de nouveau présentes
+            await page.waitForSelector('.il-card', { timeout: 30000 });
+          } else {
+            hasNextPage = false;
+            log.info("✅ Fin de la pagination, plus de pages.");
+          }
+        }
       } catch (e) {
         log.warning(
           "⚠️ Erreur lors de l'interaction avec les filtres Immonot",
