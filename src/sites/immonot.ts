@@ -27,7 +27,7 @@ export const immonotScraper = async () => {
     launchContext: {
       launcher: chromium, // toujours playwright.chromium
       launchOptions: {
-        headless: false,
+        headless: true,
         executablePath: chromiumPath, // utilise soit celui du système, soit celui de Playwright
       },
     },
