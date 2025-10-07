@@ -1,42 +1,30 @@
 import { PlaywrightCrawler } from "crawlee";
-import fs from "fs";
-import os from "os";
 import { chromium } from "playwright";
 import { deleteMissingAnnonces, insertAnnonce } from "../db";
 
-// Fonction utilitaire pour obtenir le bon chemin Chromium
-function getChromiumPath(): string | undefined {
-  // Si on est sur un Raspberry Pi (ARM) et que chromium est installé par apt
-  if (
-    os.arch() === "arm64" ||
-    os.arch() === "arm" ||
-    fs.existsSync("/usr/bin/chromium-browser")
-  ) {
-    return "/usr/bin/chromium-browser";
-  }
-
-  // Sinon, laisser Playwright utiliser son Chromium interne
-  return undefined;
-}
-
 export const immonotScraper = async () => {
-  const chromiumPath = getChromiumPath();
 
   const crawler = new PlaywrightCrawler({
-    requestHandlerTimeoutSecs: 300, // 5 minutes au lieu de 60 secondes
     launchContext: {
       launcher: chromium, // toujours playwright.chromium
       launchOptions: {
         headless: true,
-        executablePath: chromiumPath, // utilise soit celui du système, soit celui de Playwright
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--single-process',
+          '--no-zygote',
+        ],
       },
-    },
+    },    
     async requestHandler({ page, log }) {
       log.info("🚀 Scraping Immonot démarré...");
 
       await page.goto("https://www.immonot.com/immobilier.do");
       log.info("✅ Page chargée.");
-      await page.waitForLoadState("networkidle", { timeout: 20000 });
+      await page.waitForLoadState("networkidle", { timeout: 60000 });
 
       try {
         // Accepter cookies (si présent)
@@ -108,7 +96,7 @@ export const immonotScraper = async () => {
         
         // Lancer la recherche
         await page.locator('button.il-search-btn.js-search-update').click();
-        await page.waitForLoadState("networkidle", { timeout: 20000 });
+        await page.waitForLoadState("networkidle", { timeout: 60000 });
         log.info("✅ Filtres appliqués et résultats chargés.");
 
         // --- Scraping des annonces ---
