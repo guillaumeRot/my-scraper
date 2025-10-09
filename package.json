@@ -2,9 +2,10 @@
   "name": "my-scraper",
   "version": "1.0.0",
   "type": "module",
+  "main": "handler.js",
   "scripts": {
-    "dev": "tsx watch server.js",
-    "start": "tsx server.js",
+    "dev": "tsx watch dev.js",
+    "start": "node handler.js",
     "api": "tsx server.js",
     "build": "tsc",
     "init-db": "node scripts/init-db.js"
