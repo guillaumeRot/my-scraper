@@ -1,6 +1,6 @@
 import 'dotenv/config';
-import { closeDb, initDb } from "./src/db.js";
-import { immonotScraper } from "./src/sites/immonot.js";
+import { closeDb, initDb } from "./src/db.ts";
+import { immonotScraper } from "./src/sites/immonot.ts";
 
 export default async function handler(req, res) {
   // Simule express pour compatibilité

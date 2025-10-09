@@ -1,6 +1,6 @@
 import { PlaywrightCrawler, RequestQueue } from "crawlee";
 import { chromium } from "playwright";
-import { deleteMissingAnnonces, insertAnnonce } from "../db.js";
+import { deleteMissingAnnonces, insertAnnonce } from "../db";
 
 export const immonotScraper = async () => {
   const requestQueue = await RequestQueue.open();

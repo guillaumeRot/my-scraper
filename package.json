@@ -5,7 +5,7 @@
   "main": "handler.js",
   "scripts": {
     "dev": "tsx watch dev.js",
-    "start": "node handler.js",
+    "start": "tsx handler.js",
     "api": "tsx server.js",
     "build": "tsc",
     "init-db": "node scripts/init-db.js"
